@@ -1600,6 +1600,7 @@ hubble:
         # @schema
         # -- Metrics relabeling configs for the ServiceMonitor hubble-relay
         metricRelabelings: ~
+      metricsService: true
     gops:
       # -- Enable gops for hubble-relay
       enabled: true
@@ -2203,6 +2204,7 @@ prometheus:
     metricRelabelings: ~
     # -- Set to `true` and helm will not check for monitoring.coreos.com/v1 CRDs before deploying
     trustCRDsExist: false
+  metricsService: true
   # @schema
   # type: [null, array]
   # @schema
@@ -2491,6 +2493,7 @@ envoy:
       # -- Metrics relabeling configs for the ServiceMonitor cilium-envoy
       # or for cilium-agent with Envoy configured.
       metricRelabelings: ~
+    metricsService: true
     # -- Serve prometheus metrics for cilium-envoy on the configured port
     port: "9964"
 # -- Enable/Disable use of node label based identity
@@ -2782,6 +2785,7 @@ operator:
       # @schema
       # -- Metrics relabeling configs for the ServiceMonitor cilium-operator
       metricRelabelings: ~
+    metricsService: true
   # -- Grafana dashboards for cilium-operator
   # grafana can import dashboards based on the label and value
   # ref: https://github.com/grafana/helm-charts/tree/main/charts/grafana#sidecar-for-dashboards

@@ -2099,6 +2099,9 @@
             "enabled": {
               "type": "boolean"
             },
+            "metricsService": {
+              "type": "boolean"
+            },
             "port": {
               "type": "string"
             },
@@ -2950,6 +2953,9 @@
             "prometheus": {
               "properties": {
                 "enabled": {
+                  "type": "boolean"
+                },
+                "metricsService": {
                   "type": "boolean"
                 },
                 "port": {
@@ -4430,6 +4436,9 @@
             "enabled": {
               "type": "boolean"
             },
+            "metricsService": {
+              "type": "boolean"
+            },
             "port": {
               "type": "integer"
             },
@@ -4808,6 +4817,9 @@
             "null",
             "array"
           ]
+        },
+        "metricsService": {
+          "type": "boolean"
         },
         "port": {
           "type": "integer"
