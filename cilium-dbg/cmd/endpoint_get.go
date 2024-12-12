@@ -4,9 +4,6 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -50,26 +47,10 @@ var endpointGetCmd = &cobra.Command{
 			endpointInst = append(endpointInst, result)
 		}
 
-		if command.OutputOption() {
-			if err := command.PrintOutput(endpointInst); err != nil {
-				os.Exit(1)
-			}
-			return
+		command.ForceJSON()
+		if err := command.PrintOutput(endpointInst); err != nil {
+			os.Exit(1)
 		}
-
-		result := bytes.Buffer{}
-		enc := json.NewEncoder(&result)
-		enc.SetEscapeHTML(false)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(endpointInst); err != nil {
-			Fatalf("Cannot marshal endpoints %s", err.Error())
-		}
-
-		expandedResult, err := expandNestedJSON(result)
-		if err != nil {
-			Fatalf("Cannot expand nested JSON: %s", err)
-		}
-		fmt.Println(expandedResult.String())
 	},
 }
 
