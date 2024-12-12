@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -115,15 +116,16 @@ func BenchmarkNotifyOnDNSMsg(b *testing.B) {
 	endpoints := make([]*endpoint.Endpoint, nEndpoints)
 	for i := range endpoints {
 		endpoints[i] = &endpoint.Endpoint{
-			ID:   uint16(i),
-			IPv4: netip.MustParseAddr(fmt.Sprintf("10.96.%d.%d", i/256, i%256)),
-			SecurityIdentity: &identity.Identity{
-				ID: identity.NumericIdentity(i % int(identity.GetMaximumAllocationIdentity(option.Config.ClusterID))),
-			},
+			ID:               uint16(i),
+			IPv4:             netip.MustParseAddr(fmt.Sprintf("10.96.%d.%d", i/256, i%256)),
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 			DNSZombies: &fqdn.DNSZombieMappings{
 				Mutex: lock.Mutex{},
 			},
 		}
+		endpoints[i].SecurityIdentity.Store(&identity.Identity{
+			ID: identity.NumericIdentity(i % int(identity.GetMaximumAllocationIdentity(option.Config.ClusterID))),
+		})
 		ep := endpoints[i]
 		ep.UpdateLogger(nil)
 		ep.DNSHistory = fqdn.NewDNSCache(0)

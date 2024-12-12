@@ -6,6 +6,7 @@ package auth
 import (
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -303,16 +304,18 @@ func Test_authMapGarbageCollector_cleanupEndpoints(t *testing.T) {
 	gc := newAuthMapGC(hivetest.Logger(t), authMap, nil, nil)
 	gc.endpointsCache = map[uint16]*endpoint.Endpoint{
 		1: {
-			SecurityIdentity: &identity.Identity{
-				ID: 2,
-			},
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 		},
 		2: {
-			SecurityIdentity: &identity.Identity{
-				ID: 3,
-			},
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 		},
 	}
+	gc.endpointsCache[1].SecurityIdentity.Store(&identity.Identity{
+		ID: 2,
+	})
+	gc.endpointsCache[2].SecurityIdentity.Store(&identity.Identity{
+		ID: 3,
+	})
 	gc.endpointsCacheSynced = true
 
 	assert.Len(t, authMap.entries, 3)
@@ -343,26 +346,30 @@ func Test_authMapGarbageCollector_cleanupEndpointsNoopCase(t *testing.T) {
 	gc := newAuthMapGC(hivetest.Logger(t), authMap, nil, nil)
 	gc.endpointsCache = map[uint16]*endpoint.Endpoint{
 		1: {
-			SecurityIdentity: &identity.Identity{
-				ID: 1,
-			},
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 		},
 		2: {
-			SecurityIdentity: &identity.Identity{
-				ID: 2,
-			},
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 		},
 		3: {
-			SecurityIdentity: &identity.Identity{
-				ID: 3,
-			},
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 		},
 		4: {
-			SecurityIdentity: &identity.Identity{
-				ID: 3,
-			},
+			SecurityIdentity: atomic.Pointer[identity.Identity]{},
 		},
 	}
+	gc.endpointsCache[1].SecurityIdentity.Store(&identity.Identity{
+		ID: 1,
+	})
+	gc.endpointsCache[2].SecurityIdentity.Store(&identity.Identity{
+		ID: 2,
+	})
+	gc.endpointsCache[3].SecurityIdentity.Store(&identity.Identity{
+		ID: 3,
+	})
+	gc.endpointsCache[4].SecurityIdentity.Store(&identity.Identity{
+		ID: 3,
+	})
 	gc.endpointsCacheSynced = true
 
 	assert.Len(t, authMap.entries, 3)

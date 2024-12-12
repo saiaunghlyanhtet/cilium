@@ -243,7 +243,7 @@ type Endpoint struct {
 
 	// SecurityIdentity is the security identity of this endpoint. This is computed from
 	// the endpoint's labels.
-	SecurityIdentity *identity.Identity `json:"SecLabel"`
+	SecurityIdentity atomic.Pointer[identity.Identity]
 
 	// policyMap is the policy related state of the datapath including
 	// reference to all policy related BPF
@@ -684,11 +684,11 @@ func (e *Endpoint) GetID() uint64 {
 
 // GetLabels returns the labels.
 func (e *Endpoint) GetLabels() labels.Labels {
-	if e.SecurityIdentity == nil {
+	if e.SecurityIdentity.Load() == nil {
 		return labels.Labels{}
 	}
 
-	return e.SecurityIdentity.Labels
+	return e.SecurityIdentity.Load().Labels
 }
 
 // GetSecurityIdentity returns the security identity of the endpoint. It assumes
@@ -698,7 +698,7 @@ func (e *Endpoint) GetSecurityIdentity() (*identity.Identity, error) {
 		return nil, err
 	}
 	defer e.runlock()
-	return e.SecurityIdentity, nil
+	return e.SecurityIdentity.Load(), nil
 }
 
 // GetID16 returns the endpoint's ID as a 16-bit unsigned integer.
@@ -796,8 +796,8 @@ func (e *Endpoint) GetEndpointNetNsCookie() uint64 {
 }
 
 func (e *Endpoint) getIdentity() identity.NumericIdentity {
-	if e.SecurityIdentity != nil {
-		return e.SecurityIdentity.ID
+	if e.SecurityIdentity.Load() != nil {
+		return e.SecurityIdentity.Load().ID
 	}
 
 	return identity.InvalidIdentity
@@ -885,7 +885,7 @@ func (e *Endpoint) ConntrackLocal() bool {
 // ConntrackLocalLocked is the same as ConntrackLocal, but assumes that the
 // endpoint is already locked for reading.
 func (e *Endpoint) ConntrackLocalLocked() bool {
-	if e.SecurityIdentity == nil || e.Options == nil ||
+	if e.SecurityIdentity.Load() == nil || e.Options == nil ||
 		!e.Options.IsEnabled(option.ConntrackLocal) {
 		return false
 	}
@@ -966,10 +966,11 @@ func parseEndpoint(ctx context.Context, owner regeneration.Owner, policyGetter p
 	}
 
 	// Make sure the endpoint has an identity, using the 'init' identity if none.
-	if ep.SecurityIdentity == nil {
-		ep.SecurityIdentity = identity.LookupReservedIdentity(identity.ReservedIdentityInit)
+	if ep.SecurityIdentity.Load() == nil {
+		initIdentity := identity.LookupReservedIdentity(identity.ReservedIdentityInit)
+		ep.SecurityIdentity.Store(initIdentity)
 	}
-	ep.SecurityIdentity.Sanitize()
+	ep.SecurityIdentity.Load().Sanitize()
 
 	ep.UpdateLogger(nil)
 
@@ -1238,23 +1239,23 @@ func (e *Endpoint) leaveLocked(conf DeleteConfig) []error {
 		}
 	}
 
-	if !conf.NoIdentityRelease && e.SecurityIdentity != nil {
+	if !conf.NoIdentityRelease && e.SecurityIdentity.Load() != nil {
 		// Restored endpoint may be created with a reserved identity of 5
 		// (init), which is not registered in the identity manager and
 		// therefore doesn't need to be removed.
-		if e.SecurityIdentity.ID != identity.ReservedIdentityInit {
-			e.owner.RemoveIdentity(e.SecurityIdentity)
+		if e.SecurityIdentity.Load().ID != identity.ReservedIdentityInit {
+			e.owner.RemoveIdentity(e.SecurityIdentity.Load())
 		}
 
 		releaseCtx, cancel := context.WithTimeout(context.Background(), option.Config.KVstoreConnectivityTimeout)
 		defer cancel()
 
-		_, err := e.allocator.Release(releaseCtx, e.SecurityIdentity, false)
+		_, err := e.allocator.Release(releaseCtx, e.SecurityIdentity.Load(), false)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("unable to release identity: %w", err))
 		}
 		e.removeNetworkPolicy()
-		e.SecurityIdentity = nil
+		e.SecurityIdentity.Store(nil)
 	}
 
 	e.removeDirectories()
@@ -2156,7 +2157,7 @@ func (e *Endpoint) identityLabelsChanged(ctx context.Context) (regenTriggered bo
 		return false, nil
 	}
 
-	if e.SecurityIdentity != nil && e.SecurityIdentity.Labels.Equals(newLabels) {
+	if e.SecurityIdentity.Load() != nil && e.SecurityIdentity.Load().Labels.Equals(newLabels) {
 		// Sets endpoint state to ready if was waiting for identity
 		if e.getState() == StateWaitingForIdentity {
 			e.setState(StateReady, "Set identity for this endpoint")
@@ -2227,7 +2228,7 @@ func (e *Endpoint) identityLabelsChanged(ctx context.Context) (regenTriggered bo
 
 	// If endpoint has an old identity, defer release of it to the end of
 	// the function after the endpoint structured has been unlocked again
-	oldIdentity := e.SecurityIdentity
+	oldIdentity := e.SecurityIdentity.Load()
 	if oldIdentity != nil {
 		// The identity of the endpoint is changing, delay the use of
 		// the identity by a grace period to give all other cluster
