@@ -457,6 +457,13 @@ func HandleNodeTolerationAndTaints(wg *sync.WaitGroup, clientset k8sClient.Clien
 	// that was initialized in nodesInit.
 	ciliumPodsWatcher(wg, clientset.Slim(), nodeQueue, stopCh, logger)
 
+	if option.Config.RemoveCiliumNodeTaints {
+		err := uninstallCiliumTaints(context.Background(), clientset, &nodeGetter{}, logger)
+		if err != nil {
+			logger.Error("Failed to uninstall Cilium taints", logfields.Error, err)
+		}
+	}
+
 	for i := 1; i <= option.Config.TaintSyncWorkers; i++ {
 		wg.Add(1)
 		go func() {
@@ -468,4 +475,21 @@ func HandleNodeTolerationAndTaints(wg *sync.WaitGroup, clientset k8sClient.Clien
 			}
 		}()
 	}
+}
+
+// Remove taint from node on uninstall
+func uninstallCiliumTaints(ctx context.Context, c kubernetes.Interface, nodeGetter slimNodeGetter, logger *slog.Logger) error {
+	nodeList, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodeList.Items {
+		err := removeNodeTaint(ctx, c, nodeGetter, node.Name, logger)
+		if err != nil {
+			logger.Info("Failed to remove taint during uninstall", logfields.NodeName, node.Name, logfields.Error, err)
+			return err
+		}
+	}
+	return nil
 }
